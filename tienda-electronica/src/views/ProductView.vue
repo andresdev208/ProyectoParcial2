@@ -1,106 +1,118 @@
 <template>
   <div>
-    <h3 class="mb-3">Gestión de Productos</h3>
+    <h2>Gestión de Productos</h2>
 
-    <button class="btn btn-primary mb-3" @click="cargarProductos">
-    
-    </button>
-
-    <!-- Formulario para agregar producto -->
-    <div class="card p-3 mb-4">
-      <h5>Agregar nuevo producto</h5>
-      <div class="row g-2">
-        <div class="col-md-5">
-          <input v-model="nuevoProducto.title" class="form-control" placeholder="Nombre" />
-        </div>
-        <div class="col-md-3">
-          <input v-model="nuevoProducto.price" type="number" class="form-control" placeholder="Precio" />
-        </div>
-        <div class="col-md-3">
-          <input v-model="nuevoProducto.image" class="form-control" placeholder="URL imagen" />
-        </div>
-        <div class="col-md-1">
-          <button class="btn btn-success w-100" @click="agregarProducto">+</button>
-        </div>
+    <!-- Formulario -->
+    <div class="card p-3 mt-3">
+      <h5>{{ editing ? 'Editar' : 'Agregar' }} Producto</h5>
+      <div class="row g-2 mt-2">
+        <input v-model="form.title" class="col form-control" placeholder="Nombre" />
+        <input v-model="form.price" type="number" class="col form-control" placeholder="Precio" />
+        <input v-model="form.image" class="col form-control" placeholder="URL imagen" />
+        <button class="btn btn-success col-1" @click="saveProduct">{{ editing ? '✓' : '+' }}</button>
+        <button v-if="editing" class="btn btn-secondary col-1" @click="cancelEdit">✕</button>
       </div>
     </div>
 
-    <!-- Mensaje de carga -->
-    <div v-if="cargando" class="alert alert-info">Cargando productos...</div>
-
     <!-- Tabla -->
-    <table v-else class="table table-striped table-bordered align-middle">
+    <table class="table table-striped table-hover mt-4">
       <thead class="table-dark">
-        <tr>
-          <th>ID</th>
-          <th>Nombre</th>
-          <th>Precio</th>
-          <th>Imagen</th>
-          <th>Acciones</th>
-        </tr>
+        <tr><th>ID</th><th>Nombre</th><th>Precio</th><th>Imagen</th><th>Acciones</th></tr>
       </thead>
       <tbody>
-        <tr v-for="producto in productos" :key="producto.id">
-          <td>{{ producto.id }}</td>
-          <td>{{ producto.title }}</td>
-          <td>${{ producto.price }}</td>
-          <td><img :src="producto.image" alt="img" width="50" /></td>
+        <tr v-for="p in products" :key="p.id">
+          <td>{{ p.id }}</td>
+          <td>{{ p.title }}</td>
+          <td>${{ p.price }}</td>
+          <td><img :src="p.image" width="50" /></td>
           <td>
-            <button class="btn btn-sm btn-warning me-2" @click="editar(producto)">Editar</button>
-            <button class="btn btn-sm btn-danger" @click="eliminar(producto.id)">Eliminar</button>
+            <button class="btn btn-warning btn-sm me-2" @click="edit(p)">Editar</button>
+            <button class="btn btn-danger btn-sm" @click="remove(p.id)">Eliminar</button>
           </td>
         </tr>
       </tbody>
     </table>
+
+    <!-- Vista en tarjetas -->
+   
   </div>
 </template>
 
 <script>
-import { obtenerProductos, crearProducto, eliminarProducto, editarProducto } from "../services/productService";
+import ProductCardComponent from "../components/ProductCardComponent.vue";
 
 export default {
   name: "ProductView",
-  data() {
-    return {
-      productos: [],
-      cargando: true,
-      nuevoProducto: { title: "", price: "", image: "" },
-    };
-  },
+  components: { ProductCardComponent },
+  data: () => ({
+    products: [],
+    form: { title: "", price: "", image: "" },
+    editing: null,
+  }),
   methods: {
-    async cargarProductos() {
-  this.cargando = true;
-  const data = await obtenerProductos();
-  // Filtrar solo los productos de electrónica
-  this.productos = data.filter(p => p.category === "electronics");
-  this.cargando = false;
-},
-    async agregarProducto() {
-      if (!this.nuevoProducto.title || !this.nuevoProducto.price) return alert("Completa los campos");
-      await crearProducto(this.nuevoProducto);
-      alert("Producto agregado (simulado)");
-      this.nuevoProducto = { title: "", price: "", image: "" };
-      this.cargarProductos();
-    },
-    async eliminar(id) {
-      if (confirm("¿Eliminar producto?")) {
-        await eliminarProducto(id);
-        alert("Producto eliminado (simulado)");
-        this.cargarProductos();
+    async getProducts() {
+      try {
+        const res = await fetch("https://fakestoreapi.com/products");
+        const data = await res.json();
+        // Solo productos de electrónica
+        this.products = data.filter(p => p.category === "electronics");
+      } catch (e) {
+        console.error("Error cargando productos:", e);
       }
     },
-    async editar(producto) {
-      const nuevoNombre = prompt("Nuevo nombre:", producto.title);
-      if (nuevoNombre) {
-        producto.title = nuevoNombre;
-        await editarProducto(producto.id, producto);
-        alert("Producto editado (simulado)");
-        this.cargarProductos();
+    async saveProduct() {
+      if (!this.form.title || !this.form.price || !this.form.image) return alert("Completa todos los campos.");
+      if (this.editing) return this.updateProduct();
+      try {
+        const res = await fetch("https://fakestoreapi.com/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...this.form, category: "electronics" }),
+        });
+        const newProduct = await res.json();
+        this.products.push(newProduct);
+        this.resetForm();
+        alert("Producto agregado");
+      } catch {
+        alert("Error al agregar producto");
       }
+    },
+    async updateProduct() {
+      try {
+        await fetch(`https://fakestoreapi.com/products/${this.editing.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(this.form),
+        });
+        Object.assign(this.editing, this.form);
+        this.cancelEdit();
+        alert("Producto actualizado");
+      } catch {
+        alert("Error al actualizar producto");
+      }
+    },
+    async remove(id) {
+      if (!confirm("¿Eliminar producto?")) return;
+      await fetch(`https://fakestoreapi.com/products/${id}`, { method: "DELETE" });
+      this.products = this.products.filter(p => p.id !== id);
+    },
+    edit(p) {
+      this.editing = p;
+      this.form = { ...p };
+    },
+    cancelEdit() {
+      this.editing = null;
+      this.resetForm();
+    },
+    resetForm() {
+      this.form = { title: "", price: "", image: "" };
+    },
+    verDetalle(p) {
+      alert(`Detalles:\n${p.title}\nPrecio: $${p.price}`);
     },
   },
   mounted() {
-    this.cargarProductos();
+    this.getProducts();
   },
 };
 </script>

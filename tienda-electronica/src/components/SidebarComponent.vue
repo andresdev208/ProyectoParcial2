@@ -4,9 +4,13 @@
     <ul class="nav flex-column">
       <li class="nav-item">
         <router-link to="/dashboard/productos" class="nav-link text-white">
-          Productos
+          Gestión
         </router-link>
       </li>
+     <router-link to="/dashboard/tarjetas" class="nav-link text-white">
+       Productos
+      </router-link>
+
       <li class="nav-item mt-3">
         <button @click="$emit('cerrar-sesion')" class="btn btn-sm btn-danger w-100">
           Cerrar sesión
